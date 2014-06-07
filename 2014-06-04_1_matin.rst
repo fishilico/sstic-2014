@@ -2,10 +2,23 @@ Conférence d'ouverture (titre à venir) (Travis Goodspeed)
 ---------------------------------------------------------
 
 Présentation de "International Journal of Proof-of-Concept or Get The Fuck Out" (PoC||GTFO), avec des exemples:
+On peut avoir quelques des détails ici : http://openwall.info/wiki/people/solar/pocorgtfo
+
 
 - Méthode anti-forensic : modification du firmware d'un disque dur pour détecter la prise d'image (par ``dd``) et effacer les secteurs lus ensuite.
-- Création de fichiers polyglotes (ZIP-PDF-...), avec possibilité d'avoir un fichier valide aussi avant et après chiffrement (Angecryption).
-- ...
+- Création de fichiers polyglotes (ZIP-PDF-...), avec possibilité d'avoir un fichier valide aussi avant et après chiffrement .
+- Chiffrement Angecryption  : Ce PoC est également basé sur le travail d'@angealbertini et qui consiste à chiffrer un fichier valide (une image) avec AES en mode CBC, pour obtenir un chiffré qui est également un fichier valide, en controlant la clé et le vecteur d'initialisation. 
+- Strange Python Encoding : Petit trick sympa sur les encodages exotiques proposés par Python. On peut par exemple écrire son code en rot13.
+
+::
+
+    % cat poc.py
+    #!/usr/bin/python
+    #encoding: rot13
+    cevag 'Hello World'
+    % ./poc.py
+    Hello World
+
 
 Présentation de l'Active Directory
 ----------------------------------

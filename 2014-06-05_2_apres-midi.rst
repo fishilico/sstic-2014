@@ -1,0 +1,55 @@
+Caml crush, proxy pkcs11 filtrant (Ryad Benadjila, Thomas Calderon, Marion Daubignard, ANSSI)
+---------------------------------------------------------------------------------------------
+| Pour : échanger des secrets, échanger des messages... utilisation de pkcs11, standard avec des problèmes.
+| API de sécurité : interface de programmation
+| Ex : un utilisateur chiffre avec une clé. Les valeurs de clé ne sont pas censées être manipulées ; elles sont utilisées via des références.
+
+| PKCS#11 : standard produit par RSA Labs. Aussi nommé Cryptoki (Cryptographic Token Interface)
+| => Un standard pour limiter les interfaces propriétaires
+| De plus, ça définit une interface sécurisée. Un attaquant n'est censé utilisé que l'interface P11.
+| Usage des clés => traduction en terme d'attributs : Encrypt, Decrypt, Sensitive ("n'est pas censée être en clair à l'extérieur du dispositif")
+| Pour communiquer : opérations d'export/import (attr Wrap/Unwrap), attr Extractable.
+
+| API : confusion entre encapsulation et chiffrement. Exemple : clé "Sensitive Extractable" encapsulée avec la clé "Wrap Decrypt"
+
+| Peut-on se passer de PKCS#11 ? Non
+
+| Idée : se mettre en coupure des requêtes PKCS#11 pour protéger les firmware vulnérables. Ce proxy est situer entre l'API et le middleware PKCS#11 (qui discute avec le token).
+| Le proxy est écrit en OCaml, avec des bindings PKCS#11 vers le C.
+| Dialogue avec l'interface du client PKCS#11 (eg. Thunderbird) via socket TCP ou UNIX (SSL éventuellement).
+
+| Exemple de règles de filtrage : contre-mesures dynamiques aux attaques sur PKCS#11 en vérifiant les attributs.
+| => Ça bloque les fonctions/mécanismes dangereux.
+
+| + Offre une solution aux limitations de PKCS#11 : Segmentation des logins SO (admin) et User, filtrage d'objets sur une ressource, durcir la politique de complexité du PIN si le token ne le supporte pas.
+| + Cela cloisonne les usages du token entre des VM, avec un hyperviseur de confiance.
+
+| Bibliothèque client portable => Possibilité de port pour des matériels/systèmes non ciblés par les fournisseurs
+
+| https://github.com/ANSSI-FR/caml-crush
+
+
+Martine monte un CERT (Nicolas Bareil CERT Airbus Group)
+--------------------------------------------------------
+| Communauté des CERT fermée, ML fermée... donc c'est à partir de la feuille blanche.
+| Périmètre de sécurité : toutes les divisions internes. C'est du support aux équipes... CERT industriel (veille sur des failles, alertes gouvernementales, traiter les incidents de sécurité).
+
+| APT : guerre marketing Symantec, Karpersky...
+
+| Il ne croit pas à la Cyber Intelligence (organisation des groupes d'attaque, financements...)
+
+| Schéma classique : waterhole, spear phishing... Puis unstallation de RAT, découverte de l'environnement (.bat équivalents de nmap), puis escalade jusqu'au DC. Ensuite, qq semaines ensuite quelqu'un se connecte au RAT et exfiltre.
+
+| Peu de discrétion... plein de bourinage (dans les logs de proxy, dans les domaines les plus visités).
+| Particularité des APT : c'est un humain qui est derrière. Et il y a différents niveaux (ceux à checklist, ceux qui codent...)
+| Pillage organisé : "dir /R" + "rar" sont les outils ultimes. 2-3 jours plus tard, ils reviennent le exfiltrent quelques fichiers... Hypothèse de revente au marché noir (extraction d'abord de 100 Mo puis 40 Go).
+| Aussi, base arrière sur des serveurs inutilisés
+
+| Découverte initiale : rarement découvert en interne, mais plutôt par des alertes gouvernementales et par les concurrents (dans chaque domaine, il peut y avoir des répartitions entre les gens).
+
+| Chantiers sur la réponse sur incident : système, réseau, ...
+| Forensic : pas possible de faire à grain fin, mais collecte de marqueurs en live (in-situ). Aucun outil open-source existe.
+| IPS : problème, tout passe par HTTP. Il faut collecter les métadonnées (Suricata).
+| La Réponse sur incident, c'est un travail en équipe ; transparence totale en interne (base de connaissance avec modèle partagé ; cohérence au sein de l'équipe).
+
+

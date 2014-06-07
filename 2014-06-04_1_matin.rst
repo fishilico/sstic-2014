@@ -1,0 +1,102 @@
+Conférence d'ouverture (titre à venir) (Travis Goodspeed)
+---------------------------------------------------------
+
+Présentation de "International Journal of Proof-of-Concept or Get The Fuck Out" (PoC||GTFO), avec des exemples:
+
+- Méthode anti-forensic : modification du firmware d'un disque dur pour détecter la prise d'image (par ``dd``) et effacer les secteurs lus ensuite.
+- Création de fichiers polyglotes (ZIP-PDF-...), avec possibilité d'avoir un fichier valide aussi avant et après chiffrement (Angecryption).
+- ...
+
+Présentation de l'Active Directory
+----------------------------------
+
+| Annuaire accessible en LDAP (CN,ON,DC, ...)
+| Contrôle d'accès :
+| - security principals (représentés par SID), peut avoir des permissions
+| - securacurable objects (ACEntries dans une liste, le DACL)
+
+| => Avec ça, on a un contrôle d'accès de Windows, mais manque de granularité, d'extensibilité, ...
+
+| Droits étendus (eg. réinitialisation de mdp user), droits de modif des propriétés...
+
+| ``NTDS.dit``, bdd ESE. Extraction via des outils.
+
+| Stratégies de Groupes, GPO : maintient d'un parc homogène
+| -> Annuaire et SYSVOL
+
+
+Chemins de contrôle en environnement Active Directory (Emmanuel Gras, Lucas Bouillot, ANSSI)
+--------------------------------------------------------------------------------------------
+
+| Graphe de contrôle : contrôles de GPO, admin de machines sur lesquelles les admins de domaines se loguent
+
+| Relations de contrôle : modification de DACL...
+| Relations qui permettent de modifier une GPO : changer/écrire les chemins de GPO, ou les fichiers, ou lier des GPO
+| Relations liées aux machines locales : possibilité de piéger une machine
+
+| Fonctionnement : accès LDAP pour l'annuaire, et copie des fichiers de GPO conservant les attributs de sécurité
+| -> possibilité d'étude des relations à chaud ou à foid
+
+| Implém de BTA : données stockées sous forme de graphe (noeuds), implém Neo4j
+| Import à froid dans la BDD : le plus rapide
+
+| Représentation des relations avec d3.js, avec réponse à la question "qui est admin du domaine ?"
+| -> Visualisation d'utilisateurs avec des droits non standard, de manque d'hygiène (permissions associées à un user et pas à un groupe), et des machines serveurs Exchange (admin de dom)
+
+
+Analyse de la sécurité d'un Active Directory avec l'outil BTA  (Joffrey Czarny, Philippe Biondi, Airbus Group (CERT, IW, Cybersecurity))
+----------------------------------------------------------------------------------------------------------------------------------------
+Objectifs : AD et sécurité, vérification de bonnes pratiques, aider au nettoyage de printemps et post-compromission
+
+https://bitbucket.org/iwseclabs/bta
+
+-> Permet de cristaliser des tests, aproche temporelle (complémentaire à AD-perm, qui est "débogueur")
+
+``ntds.dit`` : parsing avec libesedb. Table à environ 3000 colonnes (trop pour Postgres), mais BDD creuse (extension de schémas) => MongoDB pour représentation compact (passage de 8 à 26 Go : pas d'explosion)
+
+Utilisation de miners : vérifie la cohérence de la bdd (passage en revue de points de contrôles et remplissage d'un rapport)
+-> arborescence de plusieurs miners pour générer un rapport, document structuré
+
+Capacité de faire des différentiels entre deux instances d'un AD
+
+Secrets d'authentification épisode II : Kerberos contre-attaque (Aurélien Bordes)
+---------------------------------------------------------------------------------
+| Principal protocole d'auth depuis Windows 2000, sur AD
+
+| 3 acteurs : Client demande au Serveur, et le tiers de confiance (KDC ou Dom Controller).
+| Le client et le serveur ont chacun un secret (clé dérivée de mdp), le KDC connaît tous les secrets, donne un "Ticket Granting Ticket" (structure opaque) à l'utilisateur, ...
+
+| Autorisation : utilisation du champ "authorization data" des tickets pour transporter les données d'auth (Priviledge Attribute Certificate) d'un DC.
+
+| TGT = ticket avec PAC chiffré avec ``K_KDC``
+| Ticket de service = transchiffrement (RC4?), le KDC rechiffre la PAC avec la clé du serveur
+| Le serveur a accès à la PAC en déchiffrant et crée le token (SID) utilisé pour la session
+
+| ``pwdump`` -> utilisateur et machine (nom fini par $) associés à des hash NTLM
+
+| ``krbtgt.hash = K_KDC``
+
+| En fait, si un attaquant a ``K_S``, il peut forger une PAC ce qui permet d'être admin local de la machine (et admin du domaine)
+| => En cas de compromission d'un AD, il faut changer les clés de serveur
+
+| En cas de récupération de hash krbtgt, on peut forget un TGT et demander un ticket de service pour n'importe quel service.
+| (Utilisation de SID connus, S-1-5-18 = system, -554 = groupe admins locaux...)
+
+| Audit : on voit l'utilisateur, mais pas les détails de la PAC.
+
+| MAIS : pas possible de changer le hash de krbtgt.
+| Il est changé automatiquement tous les 30 jours par le PDCe, et envoyé à tous les DC
+| Problème : si l'on change la clé de TGT, les TGT deviennent invalides (pas de problème) et la réplication d'AD casse.
+| Solution : il y a deux itérations de clé possible (pour récupérer la nouvelle clé lors de réplication)
+| -> mais un attaquant peut en profiter pour récupérer la nouvelle clé... Pas de transition sécurisée possible
+
+| Relation de Trust avec les domaines distants
+| -> Génération d'un Referral ticket à partir d'un TGT par le DC-A avec un clé de trust (obtenable par pwdump) pour que le client A puisse demander un ticket de service pour un service géré par DC-B.
+| Problème d'arbitraire dans la PAC de ces tickets, résolu par le filtrage des SID par DC-B pour gérer un RT.
+| Contournement avec le RID 512 = admin du domaine (RID = suffixe du SID) / SID "admin du domaine B"...
+
+| Dans une forêt, la compromission d'un domaine compromet la forêt (il faut d'autre relations d'aprobation pour restreindre).
+
+| Récupération : "AD Forest Recovery", isolation des contrôleurs de domaine et création d'un coeur de confiance
+
+| RODC : aucun secret sur un RODC, mise en cache de certains comptes.

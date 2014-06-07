@@ -1,0 +1,114 @@
+RUMPS DU SSTIC
+==============
+
+Tuto Miasm (Fabrice "Serpi" Desclaux, CEA)
+------------------------------------------
+https://code.google.com/p/miasm
+
+
+Low-power ARM-based pax/grsec-enables server (Arnaud Ebalaed)
+-------------------------------------------------------------
+| Cloud ISO 14001 - Take 2
+| Avancement depuis un an
+| http://natisbad.org/ pour les kernels
+| -> Noyaux pour ARM, pour des NAS.
+
+| Linksys vient de sortir WRT54G, 2 puces de chiffrement.
+
+Let's talk about SELKS (Éric Leblond, Stamus Network)
+-----------------------------------------------------
+| Pb de sexy dans la sécurité défensive.
+| Suricata 2.0 : sort des alertes et des logs
+| -> branchement sur Kibana et Elastic Search (format JSON)
+| -> Deny on Monitoring : filtrer un pattern
+| @Regiteric
+
+Parsifal (T. Calderon, O. Levillain, ANSSI)
+-------------------------------------------
+| -> Analyse de formats pcap -> Possibilité de déchiffrer les tickets Kerberos. Objectif : détecter des anomalies.
+| C'est du Caml. Code bientôt sur Github.
+
+[snip]
+
+La sécurité de l'ADSL... ailleurs (Nicolas Ruff @newsoft, Google)
+-----------------------------------------------------------------
+Étude du modem de Swisscom : mdp admin par défaut, shell root, tout tourne en root, commande "magic" assez étrange.
+
+Private meeting... (Aurélien Bordes)
+------------------------------------
+| Étude de la protection des calendriers sur Outlook.
+
+| Outlook, calendrier => fonction de partage de calendrier
+| MAPI ... protocoles compliqués... Nouvelles normes EWS (ExchangeWeb service) => HTTP
+| -> il y a des champs pour la confiendentialité.
+| -> Le champs "privé" est public
+
+From NAND till dump, a brutal alternative to BGA unsoldering (Jean-Yves Burlett, Thales)
+----------------------------------------------------------------------------------------
+| Pb avec un produit unique, pas de possibilité de le casser.
+| -> démo soudures sales sur les pistes de la carte puis dump de la NAND
+
+X86 antidecode (Axel Tillequin @bdcht)
+--------------------------------------
+(Slides : http://slides.com/bdcht/x86-anti-decode#/)
+
+| x86 oddities : https://code.google.com/p/corkami/wiki/x86oddities
+| eg. préfixes. limités à 4 en théorie, en décodeur c'est limité.
+| -> IDA et objdump : fail.
+
+Arrêter le DDoS de Bryan à l'aide du service marketing (Gaëtan Duchaussois)
+---------------------------------------------------------------------------
+| Utilisateur "ça marche pas" car il y a un DDoS en cours => achat de reverse proxy, ... montée en charge
+| Investigation IP -> proxy espagnol -> fail
+| => Donner un cookie aux DDosseurs ; puis le marketing dit "attaquez!" sans le vouloir
+| => HideMyAss est sympa (donne le pseudo de l'attaquant) => email => compte interne sur le site !
+
+TCP Fast Open (?, SynAckTiv)
+----------------------------
+| TCP Fast Open : TCP à la resource de HTTP -> sur Linux : sendto et setsockopt
+| TFO handshake -> TCP SYN avec un cookie. Les données sont transmises dans le SYN, même sans PUSH => bypass de Suricata et de Snort.
+
+REbus (Philippe Biondi, Aribus Group Innvoations)
+-------------------------------------------------
+| Bus de communication orienté outils de reverse.
+| -> Transformer un programme en agent qui fournit des données.
+| => Possibilités de faire collaborer divers outils.
+
+BNew (Xavier Merhenberger, Airbus IW)
+-------------------------------------
+| Application de REbus pour classifier des espèces (dentogrammes pour classifier les espèves vivantes)
+| -> avec fonction de hashage pour des distances entre mnemoniques.
+| Distance de Jaccard entre deux ensembles : ``|{inter}|/|{union}|``, matrice de dissimilarité
+| Puis génération de graphe avec graphviz.
+
+Incident Response & Malware Analysis IRMA (Alexandre Quint, Quarkslab)
+----------------------------------------------------------------------
+| Analyse de fichiers, contrôle des fichiers analysés, utilisation en mode public et privé.
+| Licence Apache 2.0 sur https://github.com/quarkslab
+| @irma-qb
+
+Android 0dayz hunting (Fabien Perigaud)
+---------------------------------------
+| Pourquoi chercher des vuln ? Forensics...
+
+| "ASEC", dans le dernier ChangeLog d'Android, pour stocker des infos en dur dans la SD card.
+| => vuln introduite en 2010, patchée en 2014.
+
+| http://blog.cassidiancybersecurity.com/post/2014/06/Android-4.4.3%2C-or-fixing-an-old-local-root
+
+Les actes SSTIC en ebook (Yves-Alexis Perez, ANSSI)
+---------------------------------------------------
+| Alternative au papier et au PDF. Plusieurs formats : mobi/azw3 (Amazon, propriétait) et epub (ouvert, HTML/CSS)
+| Actuellement, actes rédigés en LATEX. Comment générer en HTML et le convertir en ebook ?
+| latex->HTML : état de l'art peu satisfaisant : Hevea, pandoc, tex4ht. Mais pas de include, problèmes avec les document class
+| -> Les epub sont dispo, mais ya pas d'epub.
+
+Radio sur canapé (Jean-Philippe Gaulier @jpgaulier)
+---------------------------------------------------
+| Ouest France a publié il y a un an un article à propos de "Rennes 1 passe au tout digital", en particulier dans l'amphi dans lequel se passe les conférences.
+| Effectivement, dans la salle a été posé un Keykeriki pour capter les puces Nordic RF (cf. conf' du mercredi soir). Il se trouve que les commandes de l'amphi (rideau, lumière) utilisent ces puces pour communiquer, avec un chiffrement effectué avec une clé de 16 bits et qui peut être cassé avec un vieux Nokia.
+| Démo : le speaker a pwned tout l'amphi ;)
+
+Rump d'Aurélien Francillon (Eurecom)
+------------------------------------
+| Pas de notes par manque de baterie :(

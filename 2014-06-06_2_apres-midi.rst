@@ -1,0 +1,110 @@
+When dynamic VM migration falls under the control of VM user (Kahina Lazri, Orange Labs)
+----------------------------------------------------------------------------------------
+| Etude des nouvelles vulnérabilités liées au cloud (virtualisation, partage des resources...)
+| "Cloud élastique" : s'il y a réajustement des resources allouées aux VM selon leur besoin dans le temps.
+| != "dynamicité" (ce qui existeaujourd'hui) : les clients achètent une quantité de resource maximale.
+| -> Si toutes les VM utilisent beaucoup de resources, il y a migration de VM pour répartir.
+| => Mise en place de "Dynamic resource Allocation"
+
+| Algorithme DRS de VMWare (Distributed Resource Scheduler)
+| -> Utilisation des seuils de "target imbalance" pour conditionner la possibilité de migrer des VM.
+| Objectif de l'attaque : générer un "current imbalance" supérieur au "target imbalance"
+| => ça déclenche des migrations, et avec 2 VM d'un męme cluster VMWare, il est possible de déclencher les migrations en série.
+
+| Etude de la vulnérabilité : détermination des resources que doivent avoir les VM pour pouvoir déclencher une "instabilité".
+
+
+RpcView, un outil d'exploration et de décompilation des MS RPC (Jean-Marie Borello, DGA-MI, Investigation Malware & Products Security)
+--------------------------------------------------------------------------------------------------------------------------------------
+| MS RPC, présentée en 2006 (implém RPC de Microsoft)
+| Encore très utilisé sur Windows 8, et pas d'équivalent à ProcessExplorer, ProcessHacker. Il y a des plugins IDA, mais obsolètes.
+
+| Production des binaires RPC : source = fichier IDL, compilé avec midl => Client stub, header, server stub. Ensuite compilation C avec code client et code serveur.
+| -> Décompilation du server stub faisable (plusieurs interfaces...)
+
+| Au niveau client : Application - Client stub - RPC Runtime (Rpcrt4.dll) - Transport Layer (TCP/IP...)
+
+| Analyse de Runtime RPC.
+| - variable global RPC_SERVER, qui a 3 tables : interfaces, adresses (endpoints) et AuthInfo.
+|   ^-- interfaces -> structure "RPC_INTERFACE" qui contient la structure "Server Interface" du server Stub.
+
+| => Visualisation : processus, interfaces, et description des interfaces.
+
+| Démo : Stuxnet contre Stuxnet via RPC (il y a un serveur RPC pour la mise à jour)
+| -> Certaines commandes RPC permettent d'exécuter du code.
+
+| Perpectives : évolution des RPC vers le DCOM (COM+ proxy, entre le stub et le runtime RPC)
+
+| Produit distribué en Freeware sur http://www.rpcview.com/
+
+
+Haka, un langage orienté réseaux et sécurité (Arkoon, OpenWide, Télécom ParisTech)
+----------------------------------------------------------------------------------
+| Définition d'un langage pour de la dissection protocolaire, avec définition d'une API (checksums...)
+| Archi : en C, modulaire, avec extension du langage lua
+
+| Interface avec la capture Linux : pcap et nfqueue
+| Langage découpé en 2 parties : dissecteurs (IP, UDP, ...), qui appellent des règles de sécurité (filtrage, alertes, modification de flux à la volée, injection de paquets sur le réseau)
+| Définition d'une règle : hook & eval (on peut grossir les paquets ; ce n'est pas grave, c'est géré en interne)
+| En cas de stream, Haka réassemble le stream et fait ce qu'il faut pour traiter (ex : regex sur des flux)
+
+| -> Les règles de sécurité dépendent des événements et des modules de dissection
+
+| Pour les dissecteurs, définition d'une grammaire (champs d'un protocole). Et aussi définition d'état et d'une machine à états
+
+| C'est opensource, la v0.1 est publiée sur http://haka-security.com (et sources sur GitHub) ; la v0.2 cet été.
+
+
+De la dissuasion numérique aux cyberguerillas, prospective pour une posture de gouvernance régalienne (Fabrice Desclaux, CEA-DAM)
+---------------------------------------------------------------------------------------------------------------------------------
+Des sombres histoires de blakanisation du cyberespace ;)
+
+Tutoriel Miasm v2 (serpi)
+-------------------------
+Présentation rapide de l'archi avec le "gource" de miasm : core -> architectures, jitter.
+Nouveau : des examples et des tests avec une interface !
+
+Exemple::
+
+    from miasm2.arch.x86.arch import mn_x86
+    l = mn_x86.fromstring("XOR EAX, EBX", 32")
+    print l
+    type(l)
+    l.args
+    l.args[1] = ...
+
+Possibilité de manipuler des arguments des instructions.
+
+Utilisation du langage intermédiaire ("a" de ira = analyse)::
+
+    from miasm2.arch.x86.ira import ...
+    my_ir = ...
+    my_ir.add_instr(...)
+
+=> langage intermédiaire custom qui décrit les instructions (exemple de ADD avec tous les effets de bord sur les flags, CMOVZ pour l'affectation conditionnelle, et REPNE LODSB pour les boucles)
+
+Avec connaissance de l'ABI du compilateur, miasm défonce entre autre les flags non utilisés.
+
+Avec IDA : examples/test_ida.py => Miasm IR dans IDA
+
+Moteur de simplification... déjà vu il y a 2 ans.
+
+| Démo : code junk, code spaghetti...
+| -> avec miasm, possibilité de disassembler le code. Génération d'un graphe (xdot)
+| Instrumentation du désassembleur : ajout de callback pour définir ce qu'est un basic block.
+| Puis affichage de l'IR, puis exécution symbolique. Ça plante car miasm ne sait pas comment gérer la mémoire. Donc il faut "patcher miasm" et instrumenter "read".
+| ... Ajout de visiteur sur l'AST pour remplacer les "JNZ non conditionnels" en JMP.
+| ... Possibilité de virer des patterns d'opcodes.
+| Puis avec elfesteem... création d'une nouvelle section avec l'assembleur modifié. Donc interaction avec IDA
+| "On a mis un spaghetti droit dans l'assiette. Maintenant avec un truc récursif sur les fonctions, on peut aligner tous les spagettis dans l'assiette".
+| + émulation symbolique pour trouver les bouts de code qui s'annulent. C'est un brute-forceur (``disasm_meb_a01.py``).
+
+| Autre démo : utilisation du Jitter (en console : lancement de miasm, ``hte`` pour lire un fichier binaire généré, et IDA pour le désassemblage)
+| -> Analyse de shellcode ASCII. Exécution d'un ROP.
+| -> Option pour afficher la trace, mais en n'affichant qu'une fois chaque passage dans la boucle.
+| Sandbox... Utilisation du PEB en FS:[...] implémenté avec "un code un peu dégueulasse" ; simulation du PEB. Crash car besoin des DLL windows. "Il met toutes les merdes dans la boîtes, secoue et ensuite crashe". Car il manque ``LoadLibrary``... En fait, dans miasm il y a une implémentation de Windows en Python, "et donc pour ARM : on a réécrit Windows en architecture-independent".
+| Ensuite le shellcode download un binaire et fait un CreateProcess "qui ne fait rien".
+
+Apport des paramètres en ligne de commande : shell gdb-like, puis "redimensionne la fenętre, on dirait qu'on debug à travers le trou d'une serrure", interface gdb... utilisation via IDA.
+
+Conclusion du tuto : https://twitter.com/newsoft/status/474916294840844288/photo/1

@@ -1,0 +1,96 @@
+Analyse sécurité des modems des terminaux mobiles (Benoit Michau, ANSSI)
+------------------------------------------------------------------------
+
+| Mise en place d'un banc de test pour étudier les protocoles récents (LTE...)
+| 2G : peu de sécurité, 3G mieux, LTE encore mieux ?
+
+| Procédures non sécurisées...
+| Plusieurs protocoles mis en oeuvre (empilement historique)
+
+| -> Tests sur les champs (TLV avec valeurs dans les champs de "taille fixe") car peu de sécurité (un modem doit ętre performant)
+| Test sur les protocoles : fuzzing
+
+| Vidéo de test : liaison antenne-coeur de réseau (en Python) via protocole S1
+| puis création d'un contexte GTP, encapsulation d'IP
+
+| -> Analyse de mobiles du point de vue de l'antenne, wireshark est capable de décoder LTE
+| -> NMap : rien de bizare
+
+| Puis scan de toutes les procédures EMM
+
+| Résultat : les failles existent chez de nombreux fabricants et éditeurs
+
+| Failles :
+| - pas d'info si le canal n'est pas chiffré
+| - Exemple : découverte d'un champs TLV de 16 octets qui entraîne le crash (précédé s'une levée d'exception), faille corrigée rapidement
+| - Attachement à un faux réseau qui demande d'utiliser les modes sans chiffrement ni vérification d'intégrité
+
+
+Analyze de l'Android market avec Hooker (Dimitri Kirchner, Georges Bossert)
+---------------------------------------------------------------------------
+
+| Modèle de sécurité Android : demander des permissions à l'utilisateur
+| -> Questions... utilisation des resources autorisées
+
+| Analyse statique des applications : Androguard (Python)
+| Analyse dynamique : plusieurs solutions
+| - ROM spécifique, instrumenter le Kernel (DroidBox)
+| - Modifier l'APK (APIMonitor, Fino)
+| - API hooking (Substrate, Xposed)
+| Mix : "online scanners", explique les problèmes avec de jolis graphiques
+
+| Hooker : analyser plein d'application, en particulier un market
+| - Phase de microanalyse : rassembler un maximum d'informations en bdd pour ensuite faire des analyses data mining (Androguard & substrate)
+|   -> Utilisation de Substrate pour repérer à chaque utilisation d'API un ID unique, timestamp, paramètres, ... et niveau d'intrusivité (eg. écrire un SMS > lire un SMS)
+|   mais : fonctionnement en whitelist (interception que de ce que l'on connaît)
+|   - BDD distribuée Elastic Search et front end Kibana ou scripts python
+| - Macroanalyse (plusieurs app) : automatiser et paralléliser les microanalyses. Faire du data mining dans la bdd pour repérer les comportements
+|   - Configuration d'un scénario qui ressemble à un utilisateur (installation, exécution, stimulation (call, GPS, ... avec Monkey, de Google), reboot)
+|   - Post-analysis : recherches dans Elastic Search, en Python : stats & highlights (mises en valeurs)
+
+| Tests : ~1000 apps de SlideMe market et 1000 apps du Google store
+
+| Stats...
+| Recherche de vuln connues : faille Webview & "addJavascriptInterface"
+| stats crypto : la plus utilisée = AES/CBC/PKCS5Padding
+| Bitcoin miners... app qui utilisent vraiement le plus les fonctions de hash
+| Découverte de choses étranges... recherche de progs iptables, su... recherche d'élévation de privilèges ?
+
+https://github.com/AndroidHooker
+
+
+Investigation numérique et terminaux Apple iOS (Mathieu Renard, ANSSI/LAM)
+--------------------------------------------------------------------------
+
+| Question : comment faire du forensic sur un terminal fermé ?
+| Framework iPhoneDataProtection (Sogeti, opensource)
+| iPhone Backup Analyzer 2 (analyse des backups)
+| + solutions commerciales
+
+| iPhone : matériel... NAND avec le système de fichier, et SoC "Appel A7", avec un cryptoprocesseur pour chiffrer le contenu de la NAND
+|     Racine de confiance dans la ROM, SecureBoot, signature de code, chiffrement de fichiers...
+|     Plusieurs mesures pour limiter les capacités d'exploitation
+| Comment analyser ?
+| Il y a des exploits dans le BootROM, qui permettent de détourner le flux d'exécution, et lancer un daemon SSH... lecture directe de la NAND
+
+| -> Acquisition logique des données (avec l'API système)
+| Utilisation des services iTunes (usbmuxd & libmobiledevide) pour établir un canal de communication avec le terminal. Pairing quand le terminal est dévérouillé, puis démarrage du service AFC sur un port et utilisation de ce service
+| => services ? Backup, fichiers utilisateurs, SMS, contact... pas d'info sur la compromission
+|     service de débogage : écoute réseau (``com.apple.pcapd``, ``com.apple.syslog_relay``)
+| ... ça ne va pas très loin
+
+| -> Acquisition logique avec du jailbreak (en pratique ça ajoute un appel système au noyau, accessible par toute application... c'est mal)
+|     Utilisation de jailbreak opensource... p0sixpwn, evasi0n7
+|     problèmes : ça modifie le système, on ne sait pas trop comment (pb. lors de forensics... modification de la preuve)
+
+| Ex de vulnérabilité connue et corrigée : ``com.apple.mobile_image_mounter``, monte des images DMG signées par Apple pour permettre le debug d'applications. Service vulnérable sur iOS 6
+| ... utilisation d'une race condition... montage d'une image non signée
+| Ceci permet de débrider le service AFC
+
+| Et sur iOS 7.0.x ? Il y a une sandbox en plus. Exploitation d'un directory traversal dans installd... ça fait un ``chmod +x`` sur un fichier que l'on a uploadé précédemment
+| eg. mettre ``#!/usr/libexec/afcd -S -d / -p 8888``
+| ... modifier la variable ``DYLD_INSERT_LIBRARY`` (équivalente de ``LD_PRELOAD``)
+| ... cela se fait avec une Race Condition dans installd : extraction avant vérification de signature, mais vuln de dir. traversal dans afcd (une histoire de lien symbolique avec ".." déplacés plus haut)
+| ... avec l'API diagnostic, redémarrage pour démarrer le service débridé.
+
+| Conclusion : cela permet de faire une acquisition d'une image. Avec algos de différences (CTPH) on peut voir les fichiers modifiés par les jailbreak publics (qui patchent le noyau au démarrage, ajoutent des block device, des daemons...). Pour l'instant cela ne fonctionne pas sur les systèmes les plus récents (7.1) => exploit sur iPhone 5

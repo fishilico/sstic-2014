@@ -1,0 +1,87 @@
+Catch me if you can - A Compilation Of Recent Anti-Analysis In Malware (Marion Marschalek, Cyphort)
+---------------------------------------------------------------------------------------------------
+Marion Marschalek: malware analyst & reverse engineering
+
+Hunt between malware and analyst : aim not to be detected
+
+Issues with:
+
+- simulation (useless loops)
+- virtualization
+- static analysis,
+- disassembling: 0F 84 FF FF FF FF 00 = "jz $+5 ; inc [eax]" (jump before the last byte)
+- debugging
+
+Bypassing anti-analysis: 4 papers very useful... and plugins (phant0m, IDA Stealth...)
+
+Packers to prevent anylisis:
+
+- call to non-simulated APIs
+- decrypt code (=> Break breakpoints)
+- timing defense (rdtsc)
+
+... ``PEB!NtGlobalFlags``, issue with IDA Stealth plugin because trick with ``HEAP_ENTRY`` header : size in ``pHead-8``, where ``pHead = HeapAlloc(..., size, ...)``
+
+Other stories:
+
+- CVE-2014-1776 (MSIE): Exploit in HTML, swf -> js => Heap preparation. Tricky because the exploit is harder to detect
+- MIUREF and its packer... Visual Basic 6.0 (MS, 1998), no documentation... replaced by VB.NET is 2002, end of support in 2008
+
+
+Analyse du sécurité des box ADSL (Yann Bachy, Thales communication & sécurité)
+------------------------------------------------------------------------------
+| Depuis la fin des années 90, offres internet "Triple play" : internet, téléphonie, TV
+| puis Box de plus en plus sophistiqué...
+| Dans la box il y a un modem lié (boucle locale) à un DSLAM, connecté à un FAI.
+
+| Types d'attaques connues : attaquant distant (par internet) ou en local (chez soi)
+| 3ème attaque : sur la boucle locale
+| Pour l'ADSL, c'est une paire de cuivre ; ligne du téléphone
+| -> Facile d'accès car local équipement dans un immeuble.
+| => insertion d'un DSLAM + modem entre le modem de la box et le DSLAM de l'opérateur, avec un HUB ethernet
+
+| Selon les box, utilisation de paramètres ATM, PPP relativement similaires, SIP en MD5, config en HTTP/FTP/SSL (parfois, HTTP = uniquement "annonce de présence", d'autres fois il y a les màj)
+| => Possibilité de simuler un FAI avec un DSLAM connecté en ethernet avec un serveur PPP, DNS, HTTP.
+| => En poussant un nouveau firmware, il est possible de désactiver des sécurités (désactivation du pare-feu, installation d'un soft-phone pour passer des appels surtaxés, botnet...)
+
+
+La sécurité des ordivisions (Frédéric Basse, Thalès)
+----------------------------------------------------
+| Étude des smart TV
+| Fonctionnalités : web, email, Skype, streaming depuis le PC
+| Architecture : Linux, processeur MIPS32, AP wifi, UART...
+
+| Prise UART : prise jack 3.5 sur le panneau arrière qui est une sortie console U-Boot/kernel (il y a du secure-boot)
+
+| broadcast UPnP 1.4, vulnérable avec un paquet UDP... possibilité de crash. Mais pas comment exploiter cette vulnérabilité ?
+| -> Étude avec un binaire (libupnp) plus ou moins semblable (recompilé : version, archi, compilateur)
+| ... la méthode fonctionne, et on obtient un shell. Tous les processus sont root, stack exécutable...
+| ... màj signées RSA 1024, chiffrées AES ; la clé est dans le système.
+
+| Étude du système DirectFB, alternative à X-Window. Voodoo = port TCP sans auth qui permet au téléphone de streamer des vidéos directement sur la TV.
+| Partition système SquashFS (RO, signée RSA) et partition données UBIFS (RW, uniquement des fichiers de conf)
+| ... futur : attaque via ZigBee ? Comme ça, il suffirait d'être à proximité de la TV.
+
+
+La radio qui venait du froid (Alain Schneider)
+----------------------------------------------
+
+| Clavier sans fil : pas IR. Puces nRF24L01+ (Nordic RF), composant électronique sur étagère, communique en SPI, comm radio bidirectionnelle sur la bande des 2.4GHz, consomme peu, module le signal en GFSK.
+| Comment écouter les communications ? RTLSDR (radio logicielle, ~20$), mais pas au dessus de 2 GHz. USRP (jusqu'à 6GHz, ~600$). HackRF (300$, comme USRP, livraison... un jour).
+| État de l'art : Keykeriki, matériel à 200$ dans un contexte embarqué
+
+| Communication par paquet, envoi de charge utile.
+| Structure : preambule (1B), adresse (3-5B), Packet Control Field (9bits, P.I.T.A (? In The Ass)), Payload (0-32B), CRC (1-2B)
+
+| Interception par Keykeriki : puce A7125, démodule en permanence un des canaux utilisables. (Flux à 2Mbps)
+| Processeur ARM à 100MHz : identifier les paquets possibles -> récupère les adresses, ce qui facilite l'interception.
+| -> Reproductibilité : utilisation d'un analyseur logique (transfert le flux à 2Mbps au PC) et d'un arduino
+
+| Avec moins de composants : Travis Goodspeed. 3 comp : puce Nordic (3€), goodfet (40€) et PC. Astuce pour intercepter toutes les adresses en configurant le preamble 0x5555
+| -> Reproduit avec un Arduino
+
+| Code : https://github.com/cogiceo
+
+| Utilisation d'un MMDS downconverter (et son alimentation) : remoduler 2.4GHz à environ 400MHz, ce qui augmente la portée
+
+| Sécurité : Logitech avec AES, Microsoft avec un XOR en 2010.

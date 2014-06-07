@@ -1,0 +1,103 @@
+Elaboration d'une représentation intermédiaire pour l'exécution concolique et le marquage de données sous Windows (Sébastien Lecomte)
+-------------------------------------------------------------------------------------------------------------------------------------
+
+| Problème : pas de représentation intermédiaire sur Windows (équivalent de Valgrind)
+
+| Data Tainting : marque/label sur une donnée initiale, puis propagation avec les instruction
+
+| Plusieurs représentations intermédiaires : Miasm, Metasm, RIEL...
+| -> Ce n'est pas un nouveau langage. Pour l'instant implém en SMT-LIB v2
+
+| instruction : entrée, sortie et effets de bord
+
+| Implém : structures par thread (environnement du CPU) et globales (mémoire process)
+| Granularité : choix de faire un suivi au niveau de l'octet (et aussi suivi des flags)
+
+| PIN : framework d'instrumentation dynamique développé par Intel
+| -> Recompile et exécute un binaire, avec des hooks.
+| Exemple : suivi de fichier... hook les API windows
+
+| FuzzWin : détecter si les instructions de branchement sont contrôlables (Jcc...)
+| -> Démo : détection de conditions dans le fichier d'entrée pour déclencher des bugs.
+
+| Blog de Jonathan Salwan : http://www.shell-storm.org, exécution pour trouver les stack overflow, heap overflow...
+
+| Sources sur Github
+
+
+Obfuscation d'applications écrites en Python, python-pack (Ninon Eyrolles, Serge Gelton, QuarksLab)
+---------------------------------------------------------------------------------------------------
+http://blog.quarkslab.com/building-an-obfuscated-python-interpreter-we-need-more-opcodes.html
+
+| Papier sur Dropbox : client Python packé/obfusqué
+| "Packer" python : concept de frozen modules
+| Problèmes liés au fait que les noms de variables sont importants, que le bytecode est très lisible, ...
+| Problèmes dus au monkey patching (modification des variables d'un module à partir d'un autre), suivi de flot... Pas de possibilité de faire comme de l'analyse de code LLVM IR.
+
+| Utilisation de ``PyRun_SimpleString`` en injection de code dans un packer => exécution de Python arbitraire avec l'interpréteur modifié.
+| Reverse de permutation d'opcodes : lecture des modules standards, analyse du gros switch de CPython qui interpręte.
+
+| Idées : modification de la source Python (source vers source), puis interpréteur modifié (suppression de fonctionnalités, par exemple utilisation de l'attribut co_code pour récupérer le bytecode)... Désactiver l'import de modules non gelés
+| Permutation d'opcodes, utilisation de nouveaux opcodes (avec du code obfusqué en C).
+| Code automodifiant : appel à des fonctions natives. Exemple d'un function ``modify_bytecode`` qui change le bytecode de la fonction en cours d'interprétation.
+| Chiffrement des chaînes de caractères statiques, avec déchiffrement lors d'utilisation de ``LOAD_CONST``
+
+| Obfuscation de code source : éviter la comparaison avec les modules standards. Transformations source-à-source.
+| Principe : utilisation du module python pour lire l'AST (ast.parse/PrettyPrinter)
+| Quelques problèmes : quand le programmeur réécrit la fonction range, il n'est pas possible de dérouler les boucles for
+| Obfuscation des if : transformation en while avec prédicat opaque (obfuscation de condition)
+| Traduction des fonctions en code pseudo-fonctionnel (eg. utilisation de dictionnaire)
+| MBA : Mixed Boolean Arithmetic. Par ex ``a + b == a - ~b - 1``
+
+| https://github.com/gelstudios/gitfiti : obfuscation de Git.
+
+| Futur : intégration avec cxFreeze...
+
+
+Désobfuscation de DRM par attaques auxiliaires (Camille Mougey, Francis Gabriel, QuarksLab)
+-------------------------------------------------------------------------------------------
+| Constats initiaux sur la DRM : échanges réseaux avec des paquets de forte entropie.
+| - Utilisation de code flattening, avec aussi les basic blocks obfusqués.
+| -> Méthodes : étude du prog, ou approche par analyse de la trace d'exécution -> Outil pTra (Python TRace Analyser) ; idée : data mining sur "trace".
+| Utilisation d'une bdd MongoDB pour stocker les traces, avec une table par log.
+| Trace : Intel PIN, Miasm, Trace IDA
+| Désassembleur Disstorm.
+
+| -> Méthodologie : repérer les fonctions de crypto, et avec les I/O des fonctions
+| Repération de constantes "magiques" (algos de hash...).
+| => Identification d'un Mersenne Twister (PRNG), des 5 constantes de SHA-1 => identification des fonctions de SHA-1
+| Ensuite vérification des I/O des fonctions de crypto (par ex SHA-1)
+| Identification des sorties en effectuant un différentiel sur la mémoire (après - avant), en éléminant les données écrites et lues avant la fin (données temporaires ; c'est une heuristique)
+| Ensuite identification d'une gestion de certificat avec calcul de RSA... exécutions différentielles pour repérer où.
+
+| Data slicing : trouver l'ensembler des éléments ayant influencé un élément donnée (remontée à partir d'un point ; inverse du data tainting)
+| -> Utilisation de Miasm pour faire ceci.
+| ==> Reconstruction de l'algo RSA-OAEP
+
+| Analyse des blocs... reconnnaissance d'un algo de key expansion d'AES.
+| Mais : męme si la clé est en paramètre, l'entrée et la sortie sont dérivés ; mais en fait comme c'est du XOR c'est cassé.
+| Par ailleurs, utilisation des MBA pour obfusquer, mais tout le temps les męmes patterns => apprentissage des simplifications (et décodage d'un XOR)
+
+
+Résultat du challenge
+---------------------
+http://communaute.sstic.org/ChallengeSSTIC2014
+
+Source : https://github.com/gdelugre/challenge-sstic-2014/
+
+
+Exemple de renforcement de la sécurité d'un OIV (Victor Vuillard, Centre de Compétences en Cybersécurité de la DIN, C3D, EDF)
+-----------------------------------------------------------------------------------------------------------------------------
+| DIN = Division Ingénirie Nucléaire, DPN = Production
+| -> 3 paliers d'exploitation selon les sites
+
+| Contexte : sûreté nucléaire. Beaucoup de formalisme... similitudes avec la sécu informatique (notion de défense en profondeur, mesures de prévention...)
+| Durée de vie des systèmes plus importante que dans les environnements bureautiques (visites décénales...). De plus, chaque automate a un poste spécifique ; difficulté de faire une stratégie de groupe. De plus, les protocoles sont difficilement compatibles (actuellement OPC-UA = protocole industriel qui avance)
+
+| Gouvernance : intégration avec la sureté nucléaire et donc il y a du poids...
+| (Reste des slides : organisation, réunion avec d'autres organismes, appui sur les standards de l'AIEA, IEC et ANSSI)
+
+| Missions et projets de C3D : tester la sécurité des composants des équipementiers (capteurs du futur proche en comm sans fil...)
+| + Analyse d'incidents sur des systèmes embarqués, protocoles propriétaires.
+
+| Sécurité informatique et R&D : utilisation du boîtier DESIIR, montré au SSTIC il y a qq années, pour sécuriser les clés USB...

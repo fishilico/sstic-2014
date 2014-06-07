@@ -1,0 +1,168 @@
+Escalade de privilège sur Java Card (Guillaume Bouffard, Jean-Louis Lanet)
+--------------------------------------------------------------------------
+| Beaucoup de devices embarquent du Java Card
+
+| Ecriture de fichiers : méthodes natives, utilisation de JNI avec accessMethod Native...
+
+| Compilation Java : utilisation de la machine virtuelle Java
+| Sécurité des cartes divisée en 2 : hors et embarqué
+| Hors de la carte : classe -> Vérifieur de bytecode (BCV) -> convertisseur et signeur de bytecode -> fichier Java Card
+| Dans la carte : vérification de signature, du bytecode...
+
+| Attaques : logicielles (avec lecteur de carte) et physiques (canaux cachés...)
+
+| Exemple d'attaque logicielle : EMAN2, attaque présentée en 2011, exploitation de l'adresse de retour de fonction
+| -> Le contexte d'exécution est stockée sur la stack lors de l'appel de fonction
+| -> Utilisation de débordement sur les variables locales, possibilité de shellcode en détournant l'adresse de retour
+| Spéc Java Card : une méthode a un header {flags, max_stack, nargs, max_local} pour préparer la stack (bitfield de 4 bits)
+| -> dans l'exemple de carte : header non spécifié, de 3 octets
+| -> Découvert d'une méthode native dans une table de fonction (en ROM ; table d'indirection qui permet de faire des "invokestatic" avec juste un offset) implémentée dans l'EEPROM
+| Pourtant, dans la spec de Java Card, il y a explicitement pas de support de JNI
+
+| Obtenir l'adresse de shellcode : code simple (cf. SSTIC 2009)
+| Ecriture dans la table avec putstatic, puis callNative() fonction réécrite
+| => shellcode, on a accès à la ROM de la carte. Reporté aux constructeurs en 2011
+| -> Test en 2014 : des cartes lèvent une exception (0x6f00, exc système 0), d'autres crashent/coupent la connection, et enfin d'autres disent "ok"
+| -> Fuzzing... la carte est passée en mode production, arrêt de la recherche
+
+
+Risky USBusiness (Jordan Bouyat, Quarkslab)
+-------------------------------------------
+| USB : vecteur d'attaque sur des réseaux coupés du net
+
+| USB : topologie hiérarchisée. 127 périphériques par controlleur, mode maître esclave. Existence des hub, un peu particuliers ("concentrateurs"), pour étendre les prises
+| périphériques : diverses interfaces (HID (human interface device, clavier, souris...), stockage, propriétaires)
+| Types de transfert avec les endpoints : control, interrupt (eg. manette), bulk (grosses données avec correction d'erreur), isochronous (son/image, sans correction d'erreur)
+| Description d'un périphérique : version USB, VendorID, ProductID, taille maximale du paquet 0, interfaces (type et nombre d'endpoints), endpoints (direction, type de transfert...)
+| endpoint 0 : requętes standards (énumération...)
+
+| Approches de fuzzing : logicielles (avec virtualisation) et matérielles
+| - approche logicielle : fuzzing USB dans le module QEmu qui intègre un périphérique à une VM, ou périph virtuel, ou périph virtuel avec lien dans l'espace utilisateur de l'hôte pour le fuzzing.
+| - approche matérielle : matériel propriétaire (capture bas niveau-rejeu) ou avec FPGA (mais il faut reflasher à chaque modif du fuzzer)
+| -> FaceDancer : carte développée par Travis Goodspeed, émulation de périph USB avec des scripts Python en utilisant un adaptateur USB/Série, un controlleur USB et un microcontroleur
+
+| Outils de QL : se baser sur le Facedancer pour le rejeu de requęte/réponse enregistré (en pcap) via machine virtuelle ou matériel. Et un moniteur contrôle que la machine est toujours en marche.
+| Fuzzer : Radamsa, avec pattern et mutateur
+| Utilisation de l'outil Umap
+
+| Analyse de crash dans USBSTOR.sys lorsqu'une interface a 0 endpoint. Reverse... utilisation de USBD pour créer un URB. Découvert un int underflow (0-1 dans un memset)
+
+
+REboot : bootkits revisited (Samuel Chevet, Sogeti)
+---------------------------------------------------
+
+| Objectif pour Sogeti : acquérir des connaissances pour se préparer à l'analyse de firmware windows
+
+| Depuis Windows 64 bits : la signature des drivers est obligatoire et le noyau a des mécanismes de protection (page guard) pour protéger des zones spécifiques
+| => Passer par le bootloader pour désactiver la signature
+
+| Boot : BIOS, MBR, VBR (Volume Boot Record) sur 15 secteurs (driver FAT/NTFS), chargement de BOOTMGR (huffman...), chargement de winload (et sortie du realmode 16 bits)
+| winload : charge plein de choses (noyau minimaliste...) puis Ntoskrnl.exe, hal.dll, et drivers de type BOOT_START
+| Vers de moment là, la Global Descriptor Table contient encore plein d'entrées du mode réel. En fait, c'est parce que winload utilise des interruptions BIOS en realmode alors qu'il s'exécute en long mode (64 bits).
+
+| Chaîne de confiance : vérification d'intérgrité de BootMGR-16bits sur BootMGR-protected mode (32 bits), puis sur winload/winresume en 64bits, puis sur ntoskrnl.exe
+| Types d'infection : modification de MBR (code ou table de partition), du VBR
+| mais il faut garder la main dans la chaîne de boot.
+| Initialement : hook sur les IVT (interruptions du BIOS) pour patcher en mémoire les fichiers chargés. Projets : StonedBootkit, VBootKit, DreamBoot. Mais ces implémentations se concentrent principalement sur les binaires en eux-męmes avec des patterns/signatures. Donc pas générique, difficile à maintenir (à chaque nouvelle version, il faut changer les offsets)
+
+
+| Projet REboot : implémenter un bootkit de manière générique, et qui outrepasse la chaîne de confiance.
+| Suivre les changement de modes (16-32-64 bits).
+| Passage en mode protégé : mode Virtual 8086 (émulation de DOS fonctionne comme ça) C'est un EFLAGS (modification par popf ou tss 386)
+| Utilisation d'un niveau de privilège I/O (IOPL) 3 : gestion de segfault... mais problème avec les TPM qui utilisent des interruptions BIOS
+| -> IOPL 1 : trace des instructions jusqu'à "lgdt" pour charger la GDT.
+| Ensuite, BootMGR_32 prépare la pagination. Fonction ImgArchPcatStartBootApplication()
+| -> Installation de breakpoint avec entrée dans l'IDT, et utilisation des registres de debug
+| Winload commence par memset à 0 l'IDT. Puis met en place de nouvelles entrées en 64 bits. Avec un HW breakpoint il est possible de détecter cette mise en place. Avec ça, on arrive à l'exécution de winload. Il faut rester jusqu'à ntoskrnl.
+| Winload met en place une nouvelle GDT/IDT avant d'exécuter ntoskrnl.
+| Utilisation de ring 1 pour superviser les instructions privilégiées (et exécution en DPL 0 ou émulation dans le GPHandler ; ne pas oublier de mettre en place une TSS)
+| quelques cas spéciaux... par exemple lors du switch en mode protégé, il y a après coup un "jmp far..." pour revenir en mode long, et cela déclenche une GPFault car RPL != DPL)
+| Arrivé à ntoskrnl, injection du driver dans PsLoadModuleList. Mais le noyau n'est pas initialisé donc certaines API ne sont pas accessibles)
+
+| -> Pas de hook ni pattern matching ; la chaîne de confiance est intacte
+
+
+Tests d'intégrité d'hyperviseurs de machines virtuelles à distance et assisté par le matériel (Benoît Morgan et Eric Alata, LAAS-INSA Toulouse)
+-----------------------------------------------------------------------------------------------------------------------------------------------
+| Contexte : projet Secure Virtual Cloud
+
+| Virtualisation dans le cloud : matériel - hyperviseur (=gestionnaire de VMs) - VMs
+| Risques lors d'une machine virtuelle malveillante : compromossion de l'hyperviseur (complexe à détecter) par ex. pour avoir plus de resources, désactivation de l'hyperviseur, installation d'un hyperviseur malveillant
+
+| Au LAAS : module itux, qui vérifie les constantes du noyau Linux.
+| Approche : nested virtualisation. Avoir un second hyperviseur entre le matériel et l'hyperviseur, simple à étudier, pour se protéger d'attaques matérielles.
+
+| Pistes pour réaliser les tests d'intégrité :
+| - Intel AMT (processeur près de la carte mère pour l'accès à distance)
+| - Utilisation du mode de management SMM du processeur
+| - Intel SGX (enclave protégée dans la mémoire du processeur)
+| ... trop complexes
+| Ce qui est fait : périphérique PCIe dédié avec FPGA. Cela permet de réaliser des tests d'intégrité à distance sur l'hyperviseur
+
+| Etude de l'emprunte mémoire de l'hyperviseur (code, données, et structures de contrôle du processeur)
+| détection de non-évolution des VMCS (VM Control Structure), d'installation de composant bas niveau...
+
+| -> Carte PCI express avec FPGA.
+| Possibilité de lecture de la mémoire hôte via PCIe, et création d'un "Memory Process Unit" qui exécute des automates simples de vérification de mémoire.
+| (processeur LM32)
+| Travaux toujours en cours : construire des empruntes simples d'hyperviseur
+
+| Problème du cache des processeurs, qui peuvent stocker les VMCS.
+| (plugin volatility pour décoder les VMCS)
+
+
+La sécurité des systèmes mainframes (Stéphane Diacquenod, Volo IT)
+------------------------------------------------------------------
+
+| Mainframe zEntreprise EC12, compatibilité binaire des applications assurée par IBM depuis 1964
+| OS des mainframes : z/OS, z/VSE (~DOS), z/TPF (temps réel systèmes bancaires...), z/Linux, z/VM (machines virtuelles)
+
+| Architecture. Système z/OS
+| - Applications : serveurs (java tomcat depuis USS...), bases de données (DB2), Sécurité (RACF, TSS, ACF2), automatisation (TWS, SA, NV), management (ISPF, SDSF, Telnet)
+| - système : réseau (TCP/IP), stockage (HSM, RMM, SMS), E/S (JES, TSO)
+| - kernel : 2 couches, MVS puis OMVS (implém. Unix dans le noyau ; Unix System Services) et Nucleus
+
+| Composant SAF : gère les accès aux resources systèmes (au niveau de MVS/OMVS)
+| C'est là où l'on définit les resources. Il y a plein de "resources classes" (z/OS, DB2, FACILITY pour l'extension)
+| Arborescence des droits utilisateurs : groupes et utilisateurs
+| Mots de passes : 8 caractères maximum, non sensibles à la casse. Algo de stockage non standard basé sur DES, sans salt.
+| Les bases de données de RACF sont accessibles, ce qui permet de trouver les mots de passe
+
+| Gestion mémoire : héritage 4, 31 et 64 bits, donc limites 16 Mo et 2Go ("la barre") dans les applications.
+
+| Il y a des zones réservées au système, et d'autres pour le partage entre applications
+| TCB ~= processus et SRB ~= thread. Le dispatcher de z/OS dispatch les TCB/SRB sur les CPU.
+| Pour exécuter en temps que superviseur, il faut compiler le programme avec une option (AC(1)), et le mettre dans une librairie APF (=> implique sysadmin et développeurs). Au niveau du code, il faut mettre à zéro le mode "Problem" (bit P du processeur).
+| état du processeur : présence d'une "clé" (4 bits) pour protéger les accès mémoire (0 = superviseur/accès au système, 8 = utilisateur...)
+
+
+Pourquoi le scan de ports n'est pas pour les chatons ? (Adrien Guinet et Fred Raynal, QuarksLab)
+------------------------------------------------------------------------------------------------
+| Objectif : scanner un pays
+| Il y a plein d'outils de scan et de fingerprinting... bien pour un serveur ou un petit réseau.
+| Ce que l'on veut : de l'information en niveau 7, non structurée (textes, images, clés...). Distribuer les scans à travers plusieurs sondes, et ętre dynamique.
+
+| nmap : beaucoup d'attente. zmap et masscan ont des moteurs I/O asynchrones
+| Cible : union/exclusion d'intervalles d'IP... Utilisation de diviser pour régner pour répartir les sondes.
+
+| Utilisation de masscan... permutation aléatoire de toutes les ips.
+
+| Développement de nodescan pour faire du scan intelligent avec aussi récupération de certificats ssl...
+
+| https://github.com/quarkslab/nodescan
+
+| Objectif : cibler un pays.
+
+| Qu'est ce qui peut étre fait ? Scan de l'espagne en une journée. 
+| Bannière FTP : plein d'uniques... le nom est dessus.
+
+
+Cryptocoding (Jean-Philippe Aumasson, Kudelski Security)
+--------------------------------------------------------
+
+| Bugs crypto bcp plus dangereux que bug normal.
+| Heartbleed, goto fail Apple.... comment les prévenir ?
+
+| http://cryptocoding.net : quelques règles de codage
+| Garder les secrets, bien les nettoyer.
+| Bien générer l'aléatoire. ``CryptGenRandom`` de windows comme ``/dev/urandom`` de Unix.

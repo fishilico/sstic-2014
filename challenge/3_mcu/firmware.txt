@@ -1,0 +1,176 @@
+start:
+  0000: 2100111b  r1 = 0x1b
+  0004: 2001108c  r0 = 0x18c        ; r0 = "Firmware v1.33.7 starting.\n"
+  0008: c0d2      call 0x0dc        ; print(r0, 0x1b)
+  000a: 20101000  r0 = 0x1000       ; r0 = 0x1000
+  000e: 2101117c  r1 = 0x17c        ; r1 = "YeahRiscIsGood!"
+  0012: 2200120f  r2 = 0x0f         ; r2 = 0x0f
+  0016: c03c      call 0x054        ; initialize_key(r0, r1, r2)
+  0018: 20101000  r0 = 0x1000       ; r0 = 0x1000
+  001c: 210111b2  r1 = 0x1b2        ; r1 = 0x1b2  (encrypted_data)
+  0020: 22001229  r2 = 0x29         ; r2 = 0x29   (size of data)
+  0024: c076      call 0x09c        ; decrypt(r0, 0x1b2, 0x29)
+  0026: 20111000  r0 = 0x1100
+  002a: c0b4      call 0x0e0        ; get_cpu_cycles(0x1100)
+  002c: c0b6      call 0x0e4        ; r10 = read_int16be(0x1100)
+  002e: 5a00      r10 = r0
+  0030: 21001124  r1 = 0x24         ; r1 = '$'
+  0034: 200110b2  r0 = 0x1b2
+  0038: c0be      call 0x0f8        ; r0 = strchr(0x1b2, '$')
+  003a: 51aa      r1 = r10
+  003c: c10a      call 0x148        ; itoa(r0, r10)
+  003e: 21001129  r1 = 0x29
+  0042: 200110b2  r0 = 0x1b2
+  0046: c094      call 0x0dc        ; print(0x1b2, 0x29)
+  0048: 21001109  r1 = 9
+  004c: 200110a8  r0 = 0x1a8        ; r0 = "Halting.\n"
+  0050: c08a      call 0x0dc        ; print(r0, 9)
+  0052: b084      jump 0x0d8        ; halt
+
+initialize_key(r0=key, r1=prekey, r2=size_prekey):
+  0054: 5800      r8 = r0           ; r8 = r0
+  0056: 5911      r9 = r1           ; r9 = r1
+  0058: 5a22      r10 = r2          ; r10 = r2
+  005a: 3000      r0 = 0
+  005c: 21011100  r1 = 0x100
+  0060: 22001201  r2 = 1            ; for (r0 = 0; r0 != 0x100; r0 += 1) {
+  0064: 7310      r3 = r1 - r0
+  0066: a006      if =0: jump 0x06e
+  0068: f080      *(r8+r0) = r0     ;     *(r8+r0) = r0
+  006a: 6002      r0 = r0 + r2
+  006c: b3f6      jump 0x064        ; }
+  006e: 3000      r0 = 0
+  0070: 5100      r1 = r0           ; r1 = 0
+  0072: 22001201  r2 = 1
+  0076: 230013ff  r3 = 0xff         ; for (r0 = 0; r0 < 0xff; r0 += 1) {
+  007a: e480      r4 = *(r8+r0)
+  007c: 6114      r1 = r1 + r4      ;     r1 += *(r8+r0)
+  007e: 940a      r4 = r0 / r10
+  0080: 844a      r4 = r4 * r10
+  0082: 7404      r4 = r0 - r4
+  0084: e494      r4 = *(r9+r4)
+  0086: 6114      r1 = r1 + r4      ;     r1 += *(r9 + (r0 % r10))
+  0088: 5113      r1 = r1 & r3      ;     r1 &= 0xff
+  008a: e480      r4 = *(r8+r0)     ;     r4 = *(r8+r0)
+  008c: e581      r5 = *(r8+r1)
+  008e: f580      *(r8+r0) = r5     ;     *(r8+r0) = *(r8+r1)
+  0090: f481      *(r8+r1) = r4     ;     *(r8+r1) = r4
+  0092: 6002      r0 = r0 + r2
+  0094: 7430      r4 = r3 - r0      ; }
+  0096: afe2      if >=0: jump 0x07a
+  0098: d00f      ret               ; return
+
+  009a: b002      jump 0x09e
+
+decrypt(r0=key, r1=buffer, r2=size):
+  009c: b000      jump 0x09e
+  009e: 5800      r8 = r0           ; r8 = r0
+  00a0: 5911      r9 = r1           ; r9 = r1
+  00a2: 5a22      r10 = r2          ; r10 = r2
+  00a4: 3000      r0 = 0
+  00a6: 5100      r1 = r0           ; r1 = 0
+  00a8: 5200      r2 = r0
+  00aa: 230013ff  r3 = 0xff
+  00ae: 24001401  r4 = 1            ; for (r2 = 0; r2 != r10; r2 += 1) {
+  00b2: 6024      r0 = r2 + r4
+  00b4: 5003      r0 = r0 & r3      ;     r0 = (r2 + 1) & 0xff
+  00b6: e580      r5 = *(r8+r0)     ;     r5 = *(r8+r0)
+  00b8: 6115      r1 = r1 + r5
+  00ba: 5113      r1 = r1 & r3      ;     r1 = (r1 + r5) & 0xff
+  00bc: e580      r5 = *(r8+r0)
+  00be: e681      r6 = *(r8+r1)     ;     r6 = *(r8+r1)
+  00c0: f680      *(r8+r0) = r6     ;     *(r8+r0) = r6
+  00c2: f581      *(r8+r1) = r5     ;     *(r8+r1) = r5
+  00c4: 6556      r5 = r5 + r6
+  00c6: 5553      r5 = r5 & r3      ;     r5 = (r5 + r6) & 0xff
+  00c8: e585      r5 = *(r8+r5)     ;     r5 = *(r8+r5)
+  00ca: e692      r6 = *(r9+r2)
+  00cc: 3665      r6 = r6 ^ r5
+  00ce: f692      *(r9+r2) = r6     ;     *(r9+r2) ^= r5
+  00d0: 6224      r2 = r2 + r4
+  00d2: 75a2      r5 = r10 - r2     ; }
+  00d4: a7dc      if !=0: jump 0x0b2
+  00d6: d00f      ret               ; return
+
+halt:
+  00d8: c801      syscall 1
+  00da: b3fc      jump 0x0d8
+
+print(r0=buffer, r1=length):
+  00dc: c802      syscall 2
+  00de: d00f      ret
+
+get_cpu_cycles(r0=buffer_for_uint16be):
+  00e0: c803      syscall 3
+  00e2: d00f      ret
+
+read_int16be(r0=string):
+  00e4: 21001101  r1 = 1
+  00e8: 22011200  r2 = 0x100
+  00ec: e301      r3 = *(r0+r1)     ; r3 = *(r0+1)
+  00ee: 7111      r1 = r1 - r1
+  00f0: e401      r4 = *(r0+r1)     ; r4 = *(r0)
+  00f2: 8442      r4 = r4 * r2
+  00f4: 4034      r0 = r3 | r4      ; r0 = r3 | (r4 * 0x100)
+  00f6: d00f      ret               ; return r0
+
+strchr(r0=string, r1=character):
+  00f8: 3222      r2 = 0
+  00fa: 23001301  r3 = 1
+  00fe: 3444      r4 = 0            ; while (*(r0) != 0) {
+  0100: e402      r4 = *(r0+r2)
+  0102: 5444      r4 = r4
+  0104: a008      if =0: jump 0x10e
+  0106: 7441      r4 = r4 - r1      ;     if (*(r0) == r1) return r0
+  0108: a006      if =0: jump 0x110
+  010a: 6003      r0 = r0 + r3      ;     r0 += 1
+  010c: b3f0      jump 0x0fe        ; }
+  010e: 3000      r0 = 0            ; r0 = 0
+  0110: d00f      ret               ; return 0
+
+itoa_hexa(r0=buffer, r1=number):
+  0112: 24101400  r4 = 0x1000
+  0116: 2500150f  r5 = 0x0f
+  011a: 2600160a  r6 = 0x0a
+  011e: 27001701  r7 = 1            ; for (r4 = 0x1000; r4 != 1; r4 /= 0x10) {
+  0122: 9214      r2 = r1 / r4
+  0124: 5225      r2 = r2 & r5      ;     r2 = (r1 / r4) & 0x0f
+  0126: 7326      r3 = r2 - r6      ;     if (r2 >= 0x0a) {
+  0128: a806      if <0: jump 0x130
+  012a: 23001337  r3 = 0x37         ;         r3 = 'A' - 0x0a
+  012e: b004      jump 0x134        ;     } else {
+  0130: 23001330  r3 = 0x30         ;         r3 = '0'
+  0134: 6232      r2 = r3 + r2      ;     }
+  0136: 3333      r3 = 0
+  0138: f203      *(r0+r3) = r2     ;     *(r0) = r3 + r2
+  013a: 6007      r0 = r0 + r7      ;     r0 += 1
+  013c: 7247      r2 = r4 - r7
+  013e: a006      if =0: jump 0x146
+  0140: 6357      r3 = r5 + r7
+  0142: 9443      r4 = r4 / r3
+  0144: b3dc      jump 0x122        ; }
+  0146: d00f      ret               ; return
+
+itoa(r0=buffer, r1=number):
+  0148: 24271410  r4 = 0x2710       ; r4 = 10000
+  014c: 2500150a  r5 = 0x0a
+  0150: 3666      r6 = 0            ; r6 = 0
+  0152: 27001701  r7 = 1
+  0156: 7007      r0 = r0 - r7      ; r0 -= 1
+                                    ; do {
+  0158: 6007      r0 = r0 + r7      ;     r0 += 1
+  015a: 9214      r2 = r1 / r4      ;     r2 = r1 / r4
+  015c: 8324      r3 = r2 * r4
+  015e: 7113      r1 = r1 - r3      ;     r1 -= r2 * r4
+  0160: 9445      r4 = r4 / r5      ;     r4 /= 10
+  0162: 28001820  r8 = 0x20
+  0166: 3333      r3 = 0
+  0168: f803      *(r0+r3) = r8     ;     *(r0) = ' '
+  016a: 4662      r6 = r6 | r2      ;     r6 |= r2
+  016c: a3ea      if =0: jump 0x158 ;     if (r6 == 0) continue
+  016e: 28001830  r8 = 0x30
+  0172: 6882      r8 = r8 + r2
+  0174: f803      *(r0+r3) = r8     ;     *(r0) = '0' + r2
+  0176: 5444      r4 = r4           ; } while (r4 != 0)
+  0178: a7de      if !=0: jump 0x158
+  017a: d00f      ret               ; return

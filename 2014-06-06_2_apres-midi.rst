@@ -57,7 +57,7 @@ Haka, un langage orienté réseaux et sécurité (Arkoon, OpenWide, Télécom Pa
 
 De la dissuasion numérique aux cyberguerillas, prospective pour une posture de gouvernance régalienne (Fabrice Desclaux, CEA-DAM)
 ---------------------------------------------------------------------------------------------------------------------------------
-Des sombres histoires de blakanisation du cyberespace ;)
+Des sombres histoires de balkanisation du cyberespace ;)
 
 Tutoriel Miasm v2 (serpi)
 -------------------------
